@@ -11,6 +11,7 @@ Env:
   HF_TOKEN   required for diarization. Get at hf.co/settings/tokens and
              accept the ToS at hf.co/pyannote/speaker-diarization-3.1.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,7 +21,6 @@ import sys
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional
 
 
 def format_timestamp(seconds: float) -> str:
@@ -30,7 +30,7 @@ def format_timestamp(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
-def _read_hf_cached_token() -> Optional[str]:
+def _read_hf_cached_token() -> str | None:
     """Fall back to the token stored by `huggingface-cli login`."""
     candidates = [
         Path.home() / ".cache" / "huggingface" / "token",
@@ -49,6 +49,7 @@ def detect_device(arg: str) -> str:
         return arg
     try:
         import torch
+
         return "cuda" if torch.cuda.is_available() else "cpu"
     except ImportError:
         return "cpu"
@@ -61,11 +62,12 @@ def decode_audio_numpy(audio_path: Path, sample_rate: int = 16000):
     without needing a system ffmpeg binary or a torchaudio backend dance.
     """
     from faster_whisper.audio import decode_audio
+
     return decode_audio(str(audio_path), sampling_rate=sample_rate)
 
 
 def transcribe_words(
-    waveform, model_name: str, device: str, language: Optional[str]
+    waveform, model_name: str, device: str, language: str | None
 ) -> tuple[list[dict], dict]:
     from faster_whisper import WhisperModel
 
@@ -100,10 +102,10 @@ def transcribe_words(
 
 
 def diarize(
-    waveform, sample_rate: int, device: str, num_speakers: Optional[int], hf_token: str
+    waveform, sample_rate: int, device: str, num_speakers: int | None, hf_token: str
 ) -> list[dict]:
-    from pyannote.audio import Pipeline
     import torch
+    from pyannote.audio import Pipeline
 
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
@@ -206,9 +208,7 @@ def render_markdown(turns: list[dict], audio_meta: dict) -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="Transcribe audio with speaker diarization."
-    )
+    ap = argparse.ArgumentParser(description="Transcribe audio with speaker diarization.")
     ap.add_argument("--audio", required=True, type=Path, help="Path to audio file.")
     ap.add_argument(
         "--output-dir",
@@ -247,8 +247,7 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     device = detect_device(args.device)
-    print(f"[listen] device={device} model={args.model} audio={args.audio}",
-          file=sys.stderr)
+    print(f"[listen] device={device} model={args.model} audio={args.audio}", file=sys.stderr)
 
     # Transcription checkpoint: if a prior run cached words for the same audio
     # and model, reuse them. Lets us retry diarization without re-transcribing.
@@ -264,8 +263,7 @@ def main() -> int:
                 words = cached["words"]
                 audio_meta = cached["audio_meta"]
                 print(
-                    f"[listen] reusing cached transcription ({len(words)} words) "
-                    f"from {cache_path}",
+                    f"[listen] reusing cached transcription ({len(words)} words) from {cache_path}",
                     file=sys.stderr,
                 )
             else:
@@ -350,7 +348,11 @@ def main() -> int:
     metadata_json = args.output_dir / "metadata.json"
 
     transcript_json.write_text(
-        json.dumps({"turns": turns, "diarization_segments": segments}, indent=2, ensure_ascii=False),
+        json.dumps(
+            {"turns": turns, "diarization_segments": segments},
+            indent=2,
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
     transcript_md.write_text(render_markdown(turns, audio_meta), encoding="utf-8")

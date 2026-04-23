@@ -1,17 +1,58 @@
-# listen — audio meetings to Claude-ready notes
+<div align="center">
 
-A Claude Code skill that turns an audio recording into two things:
+# claude-listen
 
-1. A speaker-labeled transcript with timestamps.
-2. A structured `meeting-notes.md` written in the vocabulary of the current project (if a `CLAUDE.md` is present).
+**Drop a meeting recording in. Get a speaker-labeled transcript and project-aware notes back.**
 
-You invoke it inside Claude Code like a slash command:
+A [Claude Code](https://claude.ai/code) skill built on [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and [pyannote.audio](https://github.com/pyannote/pyannote-audio). All local. No extra API calls. Notes written in the vocabulary of whichever project you're in.
+
+[![CI](https://github.com/terminator1333/claude-listen/actions/workflows/ci.yml/badge.svg)](https://github.com/terminator1333/claude-listen/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10--3.13-blue.svg)](https://www.python.org/)
+[![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-8A2BE2.svg)](https://claude.ai/code)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+
+</div>
+
+---
+
+## What you type
 
 ```
 /listen ~/recordings/standup.m4a extract action items and decisions that affect the roadmap
 ```
 
-The free-text instruction after the path is optional. With no instruction, you get the full default structure (summary, decisions, action items, open questions, technical discussion, follow-ups).
+## What you get back, in `./meetings/2026-04-23-1131/`
+
+```
+transcript.md        speaker-labeled, timestamped (names, not SPEAKER_00)
+transcript.json      word-level timings + diarization segments
+meeting-notes.md     structured notes, tailored to your prompt,
+                     written in the vocabulary of the current project
+metadata.json        duration, language, model, device
+```
+
+No cloud transcription. No OpenAI Whisper API. No Otter/Fireflies upload. Audio stays on your machine; the only remote call is a one-time download of model weights from Hugging Face.
+
+---
+
+## 60-second quick-start
+
+```bash
+git clone https://github.com/terminator1333/claude-listen.git
+cd claude-listen
+uv sync
+ln -s "$(pwd)" ~/.claude/skills/listen
+huggingface-cli login    # paste a classic Read token; see HF setup below
+```
+
+Then from any Claude Code session, in any project:
+
+```
+/listen path/to/audio.m4a
+```
+
+---
 
 ## Pipeline
 
@@ -29,93 +70,25 @@ flowchart LR
     H --> J[meeting-notes.md<br/>structured, tailored to<br/>your prompt]
 ```
 
-Two Python libraries do the heavy lifting; Claude does the extraction in-session. No extra LLM API calls.
+Two Python libraries handle the audio. Claude handles the extraction in-session, using the transcript and the project's `CLAUDE.md` (or `README.md`) for context. No extra LLM call.
 
-- **Transcription**: [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (CTranslate2 backend for Whisper).
-- **Speaker diarization**: [pyannote.audio](https://github.com/pyannote/pyannote-audio) 3.x.
-- **Extraction**: Claude reads the transcript and the project's `CLAUDE.md`, then writes the notes.
+## How it compares
 
-GPU is used if available, otherwise CPU.
+| | claude-listen | Otter.ai / Fireflies | Whisper CLI alone | WhisperX |
+|---|---|---|---|---|
+| **Audio stays local** | yes | no (cloud) | yes | yes |
+| **Speaker diarization** | yes (pyannote 3.1) | yes | no | yes (pyannote 2.x) |
+| **Notes tailored to your project** | yes (reads CLAUDE.md) | generic summary | no | no |
+| **Price per hour** | free | $$ / month | free | free |
+| **Claude Code integration** | `/listen` slash command | no | no | no |
+| **Custom extraction prompt** | yes (free-text arg) | no | no | no |
+| **Works offline after first run** | yes | no | yes | yes |
 
-## How speaker identification works
+For a one-off transcription without project context, Whisper or WhisperX is fine. `claude-listen` adds two things on top: a slash-command UX inside Claude Code, and project-aware notes (the transcript alone is 30 KB for a 30-minute meeting — notes distill that into half a page of actually-useful context for future Claude sessions).
 
-Diarization is anonymous — the model only knows "this is a different voice from the last one", not who anyone is. You get labels `SPEAKER_00`, `SPEAKER_01`, and so on. Once transcription finishes, the skill walks through each detected speaker and asks you who they are.
+## Speaker mapping
 
-For each speaker you see:
-
-- The label (`SPEAKER_00`)
-- Their first substantive utterance as context (short filler like "yeah" or "uh-huh" is skipped so you get something actually identifying)
-- A list of likely names pulled from the project's `CLAUDE.md` when one exists, plus a "skip / keep anonymous" option
-
-You pick a name (or type your own via the "Other" fallback). The skill then rewrites `transcript.md` and `transcript.json` in place, substituting the real names throughout, before writing `meeting-notes.md`.
-
-If diarization splits one person across two labels or merges two people into one, you'll see the mismatch and can either assign the same name to both split labels or pick the more likely person for a merged one — the notes will reflect whatever mapping you give.
-
-## Install
-
-Requires Python 3.10+, `uv`, and `ffmpeg` in PATH.
-
-```bash
-# 1. Clone the repo.
-git clone https://github.com/terminator1333/claude-listen.git
-cd claude-listen
-
-# 2. Install deps.
-uv sync
-
-# 3. Link it as a Claude Code skill.
-ln -s "$(pwd)" ~/.claude/skills/listen
-
-# 4. Set up HF access for pyannote (one time).
-#    a. Create a *classic* Read token at https://hf.co/settings/tokens
-#       (fine-grained tokens need extra "public gated repos" permission — easier to just use Read).
-#    b. Accept the ToS on BOTH these model pages while logged in as the token owner:
-#         https://hf.co/pyannote/speaker-diarization-3.1
-#         https://hf.co/pyannote/segmentation-3.0
-#    c. Cache the token for pyannote and the rest of the HF ecosystem:
-huggingface-cli login
-#    (or export HF_TOKEN=<your-token> — either works)
-```
-
-### CUDA version
-
-`uv sync` pulls torch from PyTorch's CUDA 12.1 index by default (pinned in `pyproject.toml` to match `ctranslate2`'s CUDA runtime). This works on most modern consumer and datacenter GPUs (RTX 30-series, 40-series, A100, A6000, H100, etc.) and also falls back cleanly to CPU on machines without CUDA.
-
-If your GPU needs a different CUDA version, edit the `[[tool.uv.index]]` block in `pyproject.toml`:
-
-```toml
-[[tool.uv.index]]
-name = "pytorch-cu118"    # or cu124, cu126, etc.
-url = "https://download.pytorch.org/whl/cu118"
-explicit = true
-```
-
-…then re-run `uv sync`.
-
-## Use
-
-From any Claude Code session:
-
-```
-/listen path/to/audio.m4a
-```
-
-Or with an extraction focus:
-
-```
-/listen path/to/audio.m4a just the action items please, nothing else
-```
-
-Output goes to `./meetings/<YYYY-MM-DD-HHMM>/`:
-
-- `transcript.md` — speaker-labeled, timestamped.
-- `transcript.json` — full structured data (word-level timings, diarization segments).
-- `meeting-notes.md` — structured extraction tailored to your instruction.
-- `metadata.json` — model, device, duration, detected language.
-
-### Speaker mapping dialog
-
-After transcription, you'll see something like this in Claude Code, one question per detected speaker:
+Diarization tells you "these voices are different"; it does not tell you who anyone is. After transcription, Claude asks, one speaker at a time:
 
 ```
 ┌─ Who is SPEAKER_00? (120 turns, 2888 words) ─────────────────────┐
@@ -133,12 +106,12 @@ After transcription, you'll see something like this in Claude Code, one question
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-Name suggestions come from the project's `CLAUDE.md` when one's present. If diarization splits one person across two labels (`SPEAKER_03` and `SPEAKER_05` are both Bob), assign them the same name — the skill merges them in the final output.
+Name suggestions come from the project's `CLAUDE.md` when one exists. If diarization splits one person across two labels, assign them the same name — the skill merges them. If it merges two people into one, pick whichever attribution is more important; you can fix it by hand afterwards.
 
-### Sample `meeting-notes.md`
+## Sample `meeting-notes.md`
 
 ```markdown
-# Meeting notes — Weekly planning
+# Meeting notes — Q2 migration planning
 
 *Recorded 2026-04-15 · 45 min*
 *Attendees: Alice, Bob, Charlie*
@@ -170,11 +143,75 @@ the critical-path risk.
   shadow-write volume small enough to just replay? Unresolved.
 ```
 
-## Running the CLI directly (without Claude)
+More under [`examples/`](./examples/).
+
+## Install
+
+Requires Python 3.10–3.13, [`uv`](https://docs.astral.sh/uv/), and `ffmpeg` in PATH (PyAV ships bundled libav, so `ffmpeg` the binary is optional for most formats).
+
+```bash
+# 1. Clone the repo.
+git clone https://github.com/terminator1333/claude-listen.git
+cd claude-listen
+
+# 2. Install deps. Torch comes from the CUDA 12.1 index by default; works on CPU too.
+uv sync
+
+# 3. Link it as a Claude Code skill.
+ln -s "$(pwd)" ~/.claude/skills/listen
+
+# 4. Set up HF access for pyannote (one time).
+```
+
+### Hugging Face setup
+
+The pyannote diarization model is gated, so you need a one-time setup:
+
+1. Create a **classic Read token** at [hf.co/settings/tokens](https://hf.co/settings/tokens). (Fine-grained tokens work but need the "Read access to contents of all public gated repos you can access" permission.)
+2. Accept the ToS on **both** model pages while logged in as the token owner:
+   - [hf.co/pyannote/speaker-diarization-3.1](https://hf.co/pyannote/speaker-diarization-3.1)
+   - [hf.co/pyannote/segmentation-3.0](https://hf.co/pyannote/segmentation-3.0)
+3. Cache the token:
+   ```bash
+   huggingface-cli login
+   ```
+   Or set `HF_TOKEN=...` in your shell rc. Either works; the script checks env vars first, then `~/.cache/huggingface/token`.
+
+### CUDA version
+
+The default `uv sync` pulls torch from PyTorch's CUDA 12.1 index (pinned in `pyproject.toml` so it matches `ctranslate2`, faster-whisper's backend). This works on most modern GPUs — RTX 30/40-series, A100, A6000, H100 — and falls back to CPU on machines without CUDA.
+
+For a different CUDA version, edit the index block in `pyproject.toml`:
+
+```toml
+[[tool.uv.index]]
+name = "pytorch-cu118"    # or cu124, cu126, etc.
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+```
+
+…then re-run `uv sync`.
+
+## Use
+
+### Inside Claude Code
+
+```
+/listen path/to/audio.m4a
+/listen path/to/audio.m4a only the action items, no summary
+/listen path/to/audio.m4a what did we decide about the API redesign?
+```
+
+The free-text part guides what Claude emphasizes in the notes. Leave it blank for the full default structure (summary, decisions, action items, open questions, technical discussion, flagged follow-ups).
+
+Output goes to `<current-project>/meetings/<YYYY-MM-DD-HHMM>/`.
+
+### Directly as a CLI (no Claude)
 
 ```bash
 uv run python scripts/transcribe.py --audio meeting.m4a --output-dir out/
-# Options:
+
+# Options
 #   --model {tiny,base,small,medium,large-v2,large-v3}  default: small
 #   --device {auto,cuda,cpu}                            default: auto
 #   --language en                                       default: auto-detect
@@ -182,26 +219,48 @@ uv run python scripts/transcribe.py --audio meeting.m4a --output-dir out/
 #   --no-diarize                                        skip speaker separation
 ```
 
+Useful if you want to batch-process recordings without going through Claude.
+
 ## Hardware notes
 
 Rough wall-clock times for a 60-minute mono recording:
 
-| Hardware            | Model     | Transcribe | Diarize | Total |
-|---------------------|-----------|------------|---------|-------|
+| Hardware            | Model     | Transcribe | Diarize | Total  |
+|---------------------|-----------|------------|---------|--------|
 | CPU (8 cores)       | `small`   | ~8 min     | ~6 min  | ~14 min |
 | CPU (8 cores)       | `medium`  | ~22 min    | ~6 min  | ~28 min |
-| GPU (consumer)      | `small`   | ~30 s      | ~45 s   | ~75 s |
+| GPU (consumer)      | `small`   | ~30 s      | ~45 s   | ~75 s  |
 | GPU (consumer)      | `large-v3`| ~1.5 min   | ~45 s   | ~2.5 min |
 
-Numbers vary with recording quality, number of speakers, and model cache state.
+Numbers vary with recording quality, number of speakers, and model cache state. Diarization dominates on GPU because pyannote's pipeline is less GPU-bound than Whisper.
 
 ## Limitations
 
-- Transcript quality depends on audio quality. Noisy rooms, strong accents, and overlapping speech all degrade results. Diarization especially struggles with heavy overlap.
-- Only transcribes, doesn't translate. A meeting in French comes out as French text. Claude can still write English notes on request.
-- No voice enrollment — speakers come out as anonymous labels; you identify them manually per meeting.
-- Outputs are written to the current directory's `meetings/` folder. If you want them elsewhere, move the directory afterwards.
+- Transcript quality depends on audio quality. Noisy rooms, strong accents, and overlapping speech degrade results. Diarization especially struggles with heavy overlap.
+- Transcription only, not translation. A meeting in French comes out as French text; Claude can write English notes on request.
+- No voice enrollment. Speakers come out as anonymous labels and you identify them per meeting. (Contribution welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md).)
+- Outputs go to the current directory's `meetings/` folder. Move or symlink the folder afterwards if you want them elsewhere.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to set up a dev environment, run the test pass, and submit PRs. The codebase is small (one script + one skill file), so first-time contributors are very welcome.
+
+Some good places to start:
+
+- Voice enrollment / auto-labeling across meetings (needs a speaker-embedding store).
+- Translation mode (`--translate en` in Whisper).
+- Streaming / live mode.
+- Better error messages when diarization disagrees with the transcript.
 
 ## License
 
-MIT.
+[MIT](./LICENSE).
+
+## Acknowledgements
+
+Built on the work of:
+
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) by SYSTRAN — the CTranslate2 backend for OpenAI Whisper.
+- [pyannote.audio](https://github.com/pyannote/pyannote-audio) by Hervé Bredin et al. — the speaker diarization toolkit.
+- [Whisper](https://github.com/openai/whisper) by OpenAI.
+- [Claude Code](https://claude.ai/code) by Anthropic.

@@ -1,0 +1,11 @@
+{
+  "language": "en",
+  "language_probability": 0.98,
+  "duration": 2712.0,
+  "model": "large-v3",
+  "device": "cuda",
+  "diarized": true,
+  "num_speakers": 3,
+  "num_turns": 14,
+  "audio_path": "/example/q2-migration-planning.m4a"
+}
