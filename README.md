@@ -57,8 +57,8 @@ Requires Python 3.10+, `uv`, and `ffmpeg` in PATH.
 
 ```bash
 # 1. Clone the repo.
-git clone https://github.com/<user>/listen.git
-cd listen
+git clone https://github.com/terminator1333/claude-listen.git
+cd claude-listen
 
 # 2. Install deps.
 uv sync
