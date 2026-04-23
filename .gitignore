@@ -1,0 +1,30 @@
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Meeting outputs (per-project, not committed)
+meetings/
+
+# Audio files (don't check recordings into a public repo)
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
+*.opus
+*.webm
+*.mov
+
+# Local env
+.env
+.envrc
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# uv lockfile is committed (uv.lock), venv is not
