@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Plain-English disclaimer section in the README covering recording consent, privacy, transcription accuracy, model behavior, and third-party service risk. Complements the MIT license's legal-style warranty disclaimer.
+
 ## [0.1.0] - 2026-04-23
 
 ### Added

@@ -252,6 +252,22 @@ Some good places to start:
 - Streaming / live mode.
 - Better error messages when diarization disagrees with the transcript.
 
+## Disclaimer
+
+This software is provided **as is**, without warranty of any kind, express or implied. See [LICENSE](./LICENSE) for the full legal terms.
+
+In particular, `claude-listen` is a personal-use tool built on research-grade open-source components. You are responsible for:
+
+- **Recording consent.** Laws vary by jurisdiction — one-party consent in some places, all-party consent in others. Get consent from everyone on the call before recording. This tool does not verify or enforce consent.
+- **Privacy and data handling.** Audio recordings and the transcripts derived from them may contain confidential or personal material. Decide whether your storage, access controls, backups, and cloud-sync settings are appropriate for the content you're processing. The skill writes outputs to disk under the current working directory — be deliberate about where that is.
+- **Accuracy.** Transcription and diarization are imperfect. faster-whisper can mis-hear words; pyannote can mis-attribute speakers or split one person across labels. Errors are more common with poor audio, strong accents, overlapping speech, or background noise. Do not rely on `meeting-notes.md` as a substitute for anything where a misquote or mis-attribution could cause harm (legal testimony, medical decisions, contractual commitments). Always verify against the source recording when stakes are high.
+- **Model behavior.** Claude writes the notes by reading the transcript and the project's `CLAUDE.md`. It may summarize inaccurately, miss nuance, or infer things that weren't said. Review the output before acting on it or sharing it.
+- **Third-party services.** Pyannote's models are downloaded from Hugging Face; you accept their terms when you fetch them. Hugging Face and any cloud services you connect the tool to are outside our control.
+
+The authors and contributors accept no liability for any loss, damage, legal exposure, or other harm arising from use of this software — including but not limited to privacy breaches, disputes over recordings, data corruption, or decisions made on the basis of inaccurate transcripts or notes.
+
+Use at your own risk.
+
 ## License
 
 [MIT](./LICENSE).
