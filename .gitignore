@@ -5,6 +5,12 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 
+# Claude Code local state
+.claude/
+
+# Local SLURM / run logs (personal hostnames, paths)
+logs/
+
 # Meeting outputs (per-project, not committed)
 meetings/
 

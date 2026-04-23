@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Claude Code skill that turns audio recordings into speaker-labeled transcripts and project-aware meeting notes."
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "faster-whisper>=1.0.0",
     "pyannote.audio>=3.1",
@@ -12,10 +12,24 @@ dependencies = [
     "torchaudio>=2.1",
     "soundfile>=0.12",
     "numpy>=1.24",
+    # pyannote-audio 3.4 still calls hf_hub_download(use_auth_token=...), which
+    # huggingface-hub 1.x removed. Hold on the 0.x line until pyannote updates.
+    "huggingface-hub<1.0",
 ]
 
 [tool.uv]
 package = false
-# For CUDA torch, install a matching wheel from https://download.pytorch.org/whl/
-# after `uv sync` (the default torch on PyPI is the CUDA build on Linux; CPU-only
-# users can override with `uv pip install torch --index-url .../whl/cpu`).
+
+# Pin torch to a CUDA 12.1 build so it matches ctranslate2 (faster-whisper's
+# backend), which is compiled against CUDA 12. Users on CPU-only machines get
+# a CPU build automatically from this index. Users needing a different CUDA
+# version (e.g. cu118, cu124) can point the index below at
+# https://download.pytorch.org/whl/cu118 etc.
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
+torchaudio = { index = "pytorch-cu121" }

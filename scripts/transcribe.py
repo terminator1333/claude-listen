@@ -30,6 +30,20 @@ def format_timestamp(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
+def _read_hf_cached_token() -> Optional[str]:
+    """Fall back to the token stored by `huggingface-cli login`."""
+    candidates = [
+        Path.home() / ".cache" / "huggingface" / "token",
+        Path.home() / ".huggingface" / "token",
+    ]
+    for path in candidates:
+        if path.exists():
+            token = path.read_text().strip()
+            if token:
+                return token
+    return None
+
+
 def detect_device(arg: str) -> str:
     if arg != "auto":
         return arg
@@ -40,8 +54,18 @@ def detect_device(arg: str) -> str:
         return "cpu"
 
 
+def decode_audio_numpy(audio_path: Path, sample_rate: int = 16000):
+    """Decode any audio format to mono float32 numpy at `sample_rate`.
+
+    Goes through PyAV (bundled by faster-whisper), so m4a/mp3/flac/etc. all work
+    without needing a system ffmpeg binary or a torchaudio backend dance.
+    """
+    from faster_whisper.audio import decode_audio
+    return decode_audio(str(audio_path), sampling_rate=sample_rate)
+
+
 def transcribe_words(
-    audio_path: Path, model_name: str, device: str, language: Optional[str]
+    waveform, model_name: str, device: str, language: Optional[str]
 ) -> tuple[list[dict], dict]:
     from faster_whisper import WhisperModel
 
@@ -49,7 +73,7 @@ def transcribe_words(
     model = WhisperModel(model_name, device=device, compute_type=compute_type)
 
     segments, info = model.transcribe(
-        str(audio_path),
+        waveform,
         word_timestamps=True,
         language=language,
         vad_filter=True,
@@ -76,7 +100,7 @@ def transcribe_words(
 
 
 def diarize(
-    audio_path: Path, device: str, num_speakers: Optional[int], hf_token: str
+    waveform, sample_rate: int, device: str, num_speakers: Optional[int], hf_token: str
 ) -> list[dict]:
     from pyannote.audio import Pipeline
     import torch
@@ -85,13 +109,27 @@ def diarize(
         "pyannote/speaker-diarization-3.1",
         use_auth_token=hf_token,
     )
+    if pipeline is None:
+        raise RuntimeError(
+            "pyannote returned no pipeline. Most likely causes:\n"
+            "  - ToS not accepted. Visit https://hf.co/pyannote/speaker-diarization-3.1\n"
+            "    and also https://hf.co/pyannote/segmentation-3.0 and click 'Agree'.\n"
+            "  - HF token lacks read access, or is expired.\n"
+            "The script cannot continue without the diarization model. "
+            "Re-run with --no-diarize for a single-speaker transcript."
+        )
     if device == "cuda":
         pipeline.to(torch.device("cuda"))
+
+    # Pass waveform as a dict so pyannote skips its own audio loader (which uses
+    # torchaudio's soundfile backend and can't read m4a).
+    waveform_t = torch.from_numpy(waveform).unsqueeze(0)  # (1, num_samples)
+    audio_input = {"waveform": waveform_t, "sample_rate": sample_rate}
 
     kwargs = {}
     if num_speakers is not None:
         kwargs["num_speakers"] = num_speakers
-    diarization = pipeline(str(audio_path), **kwargs)
+    diarization = pipeline(audio_input, **kwargs)
 
     segments: list[dict] = []
     for turn, _, speaker in diarization.itertracks(yield_label=True):
@@ -212,30 +250,82 @@ def main() -> int:
     print(f"[listen] device={device} model={args.model} audio={args.audio}",
           file=sys.stderr)
 
-    t0 = time.time()
-    print("[listen] transcribing...", file=sys.stderr)
-    words, audio_meta = transcribe_words(args.audio, args.model, device, args.language)
+    # Transcription checkpoint: if a prior run cached words for the same audio
+    # and model, reuse them. Lets us retry diarization without re-transcribing.
+    cache_path = args.output_dir / "_transcription_cache.json"
+    cached = None
+    if cache_path.exists():
+        try:
+            cached = json.loads(cache_path.read_text())
+            if (
+                cached.get("audio_path") == str(args.audio.resolve())
+                and cached.get("model") == args.model
+            ):
+                words = cached["words"]
+                audio_meta = cached["audio_meta"]
+                print(
+                    f"[listen] reusing cached transcription ({len(words)} words) "
+                    f"from {cache_path}",
+                    file=sys.stderr,
+                )
+            else:
+                cached = None
+        except (json.JSONDecodeError, KeyError):
+            cached = None
+
+    # Decode the audio once (PyAV handles m4a/mp3/wav/etc.) and share the
+    # numpy array between transcription and diarization. Avoids torchaudio's
+    # soundfile backend which doesn't support compressed formats.
+    sample_rate = 16000
+    print(f"[listen] decoding audio at {sample_rate} Hz...", file=sys.stderr)
+    waveform = decode_audio_numpy(args.audio, sample_rate=sample_rate)
     print(
-        f"[listen] transcribed {len(words)} words in {time.time() - t0:.1f}s",
+        f"[listen] decoded {len(waveform) / sample_rate:.1f}s of audio",
         file=sys.stderr,
     )
 
+    if cached is None:
+        t0 = time.time()
+        print("[listen] transcribing...", file=sys.stderr)
+        words, audio_meta = transcribe_words(waveform, args.model, device, args.language)
+        print(
+            f"[listen] transcribed {len(words)} words in {time.time() - t0:.1f}s",
+            file=sys.stderr,
+        )
+        cache_path.write_text(
+            json.dumps(
+                {
+                    "audio_path": str(args.audio.resolve()),
+                    "model": args.model,
+                    "words": words,
+                    "audio_meta": audio_meta,
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
     segments: list[dict] = []
     if not args.no_diarize:
-        hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+        hf_token = (
+            os.environ.get("HF_TOKEN")
+            or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+            or _read_hf_cached_token()
+        )
         if not hf_token:
             print(
-                "ERROR: HF_TOKEN required for diarization.\n"
+                "ERROR: HF token required for diarization.\n"
                 "  1. Create a token at https://hf.co/settings/tokens\n"
                 "  2. Accept ToS at https://hf.co/pyannote/speaker-diarization-3.1\n"
-                "  3. export HF_TOKEN=<your-token>\n"
+                "  3. Either `huggingface-cli login` or export HF_TOKEN=<token>\n"
                 "Or pass --no-diarize to skip speaker separation.",
                 file=sys.stderr,
             )
             return 3
         t1 = time.time()
         print("[listen] diarizing...", file=sys.stderr)
-        segments = diarize(args.audio, device, args.num_speakers, hf_token)
+        segments = diarize(waveform, sample_rate, device, args.num_speakers, hf_token)
         n_speakers = len({s["speaker"] for s in segments})
         print(
             f"[listen] diarized into {n_speakers} speaker(s) in {time.time() - t1:.1f}s",
@@ -260,10 +350,11 @@ def main() -> int:
     metadata_json = args.output_dir / "metadata.json"
 
     transcript_json.write_text(
-        json.dumps({"turns": turns, "diarization_segments": segments}, indent=2)
+        json.dumps({"turns": turns, "diarization_segments": segments}, indent=2, ensure_ascii=False),
+        encoding="utf-8",
     )
-    transcript_md.write_text(render_markdown(turns, audio_meta))
-    metadata_json.write_text(json.dumps(metadata, indent=2))
+    transcript_md.write_text(render_markdown(turns, audio_meta), encoding="utf-8")
+    metadata_json.write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
 
     # stdout: one path per line, for the skill to parse.
     print(str(transcript_md))
