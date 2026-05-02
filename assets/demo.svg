@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720" font-family="'Source Code Pro', ui-monospace, Menlo, monospace">
+
+  <defs>
+    <!-- Clip for the typing animation: width grows from 0 to 760 -->
+    <clipPath id="typeClip">
+      <rect x="430" y="60" width="0" height="40">
+        <animate attributeName="width" from="0" to="660" begin="1.3s" dur="2.0s" fill="freeze"/>
+      </rect>
+    </clipPath>
+
+    <!-- Soft glow filter for the standup.wav row -->
+    <filter id="orangeGlow" x="-20%" y="-50%" width="140%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.8   0 0 0 0 0.47   0 0 0 0 0.36   0 0 0 1 0"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="720" fill="#0d0d12"/>
+
+  <!-- ===== LEFT PANE: file tree ===== -->
+  <g>
+    <rect x="0" y="0" width="380" height="720" fill="#11111a"/>
+    <rect x="380" y="0" width="1" height="720" fill="#1f1f2a"/>
+
+    <!-- Pane header -->
+    <text x="28" y="42" font-size="11" letter-spacing="2" fill="#6e7681">EXPLORER</text>
+    <text x="28" y="76" font-size="14" font-weight="700" fill="#f5f5f0">ledger-svc</text>
+
+    <!-- File tree -->
+    <g font-size="13" fill="#cdd0d4">
+      <text x="40" y="124">audio/</text>
+
+      <!-- standup.wav row: hidden initially, fades in at 0.5s with a glow -->
+      <g opacity="0">
+        <animate attributeName="opacity" from="0" to="1" begin="0.5s" dur="0.5s" fill="freeze"/>
+
+        <!-- Soft orange highlight, pulses once -->
+        <rect x="32" y="138" width="320" height="22" rx="4" fill="#cc785c" opacity="0">
+          <animate attributeName="opacity" values="0;0.18;0" begin="0.7s" dur="1.6s" fill="freeze"/>
+        </rect>
+
+        <text x="68" y="154" fill="#f5f5f0">└── standup.wav</text>
+        <text x="284" y="154" font-size="11" fill="#cc785c">new</text>
+      </g>
+
+      <text x="40" y="190">src/</text>
+      <text x="56" y="216">├── ledger.py</text>
+      <text x="56" y="240">├── reconcile.py</text>
+      <text x="56" y="264">└── api.py</text>
+
+      <text x="40" y="298">alembic/</text>
+      <text x="56" y="322">└── versions/</text>
+
+      <text x="40" y="356">tests/</text>
+
+      <text x="40" y="396" fill="#f5f5f0" font-weight="600">CLAUDE.md</text>
+      <text x="200" y="396" font-size="11" fill="#6e7681">read by /listen</text>
+
+      <text x="40" y="430">pyproject.toml</text>
+      <text x="40" y="460">README.md</text>
+    </g>
+
+    <!-- Footer hint -->
+    <text x="28" y="688" font-size="11" fill="#6e7681">3 machines · fra · Fly.io</text>
+  </g>
+
+  <!-- ===== RIGHT PANE: terminal ===== -->
+  <g>
+    <!-- Window chrome -->
+    <rect x="380" y="0" width="820" height="40" fill="#15151d"/>
+    <circle cx="406" cy="20" r="6" fill="#3a3a44"/>
+    <circle cx="426" cy="20" r="6" fill="#3a3a44"/>
+    <circle cx="446" cy="20" r="6" fill="#3a3a44"/>
+    <text x="800" y="25" font-size="11" fill="#6e7681" text-anchor="middle">claude-code · ~/ledger-svc</text>
+
+    <!-- Prompt + typed line -->
+    <text x="406" y="84" font-size="15" fill="#cc785c">$</text>
+
+    <!-- Typed text: revealed by clipPath, full text rendered behind -->
+    <g clip-path="url(#typeClip)">
+      <text x="430" y="84" font-size="15" fill="#f5f5f0" xml:space="preserve">/listen audio/standup.wav extract action items and decisions</text>
+    </g>
+
+    <!-- Cursor: rectangle that translates with the typing reveal, blinks before/after -->
+    <rect x="430" y="68" width="9" height="20" fill="#f5f5f0" opacity="1">
+      <!-- blink while waiting -->
+      <animate attributeName="opacity" values="1;0;1;0;1" dur="1.3s" begin="0s" fill="freeze"/>
+      <!-- ride the typing -->
+      <animate attributeName="x" from="430" to="1090" begin="1.3s" dur="2.0s" fill="freeze"/>
+      <!-- vanish at end of typing -->
+      <animate attributeName="opacity" from="1" to="0" begin="3.3s" dur="0.2s" fill="freeze"/>
+    </rect>
+
+    <!-- Progress lines: each fades in at its own time -->
+    <g font-size="14" xml:space="preserve">
+      <g opacity="0">
+        <animate attributeName="opacity" from="0" to="1" begin="3.6s" dur="0.25s" fill="freeze"/>
+        <text x="406" y="124" fill="#5dca84">✓</text>
+        <text x="430" y="124" fill="#cdd0d4">loaded faster-whisper (base) on cpu</text>
+      </g>
+      <g opacity="0">
+        <animate attributeName="opacity" from="0" to="1" begin="4.0s" dur="0.25s" fill="freeze"/>
+        <text x="406" y="148" fill="#5dca84">✓</text>
+        <text x="430" y="148" fill="#cdd0d4">transcribed 38s of audio</text>
+      </g>
+      <g opacity="0">
+        <animate attributeName="opacity" from="0" to="1" begin="4.4s" dur="0.25s" fill="freeze"/>
+        <text x="406" y="172" fill="#5dca84">✓</text>
+        <text x="430" y="172" fill="#cdd0d4">diarized 2 speakers</text>
+      </g>
+
+      <!-- After dialog dismissal: -->
+      <g opacity="0">
+        <animate attributeName="opacity" from="0" to="1" begin="9.2s" dur="0.3s" fill="freeze"/>
+        <text x="406" y="196" fill="#5dca84">✓</text>
+        <text x="430" y="196" fill="#cdd0d4">mapped speakers: SPEAKER_00→Pat, SPEAKER_01→Sam</text>
+      </g>
+      <g opacity="0">
+        <animate attributeName="opacity" from="0" to="1" begin="9.6s" dur="0.3s" fill="freeze"/>
+        <text x="406" y="220" fill="#5dca84">✓</text>
+        <text x="430" y="220" fill="#cdd0d4">wrote meetings/2026-05-02-1430/</text>
+      </g>
+    </g>
+
+    <!-- ===== Meeting-notes preview ===== -->
+    <g opacity="0">
+      <animate attributeName="opacity" from="0" to="1" begin="10.0s" dur="0.5s" fill="freeze"/>
+
+      <rect x="406" y="252" width="760" height="220" rx="6" fill="#15151d" stroke="#26262f" stroke-width="1"/>
+      <text x="424" y="282" font-size="11" letter-spacing="2" fill="#6e7681">MEETING-NOTES.MD</text>
+
+      <g font-size="13" xml:space="preserve">
+        <text x="424" y="310" fill="#f5f5f0" font-weight="700">Standup — 2026-05-02</text>
+
+        <text x="424" y="342" fill="#cc785c">## Action items</text>
+        <text x="424" y="364" fill="#cdd0d4">- [Sam] Migration review by EOD Friday</text>
+        <text x="424" y="384" fill="#cdd0d4">- [Sam] Reconciliation placement next week</text>
+
+        <text x="424" y="416" fill="#cc785c">## Decisions</text>
+        <text x="424" y="438" fill="#cdd0d4">- Keep nightly snapshots; switch to continuous post-migration</text>
+
+        <text x="424" y="460" fill="#6e7681" font-style="italic">project-aware: vocabulary from CLAUDE.md</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ===== SPEAKER-MAPPING DIALOG (overlay) ===== -->
+  <!-- The whole group translates from below the canvas up into view, then back down -->
+  <g transform="translate(0, 720)">
+    <animateTransform attributeName="transform" type="translate" from="0 720" to="0 0" begin="4.8s" dur="0.4s" fill="freeze"/>
+    <animateTransform attributeName="transform" type="translate" from="0 0" to="0 720" begin="8.8s" dur="0.4s" fill="freeze"/>
+
+    <!-- Dim backdrop over the right pane -->
+    <rect x="380" y="0" width="820" height="720" fill="#000000" opacity="0.55"/>
+
+    <!-- Dialog card -->
+    <g>
+      <rect x="466" y="220" width="650" height="280" rx="14" fill="#1a1a23" stroke="#cc785c" stroke-width="1.5"/>
+
+      <!-- Header (changes between SPEAKER_00 and SPEAKER_01) -->
+      <g>
+        <text x="496" y="262" font-size="11" letter-spacing="2" fill="#cc785c">CLAUDE-LISTEN</text>
+
+        <!-- SPEAKER_00 text: visible until the click on Pat -->
+        <g>
+          <text x="496" y="298" font-size="20" font-weight="700" fill="#f5f5f0">Who is SPEAKER_00?</text>
+          <text x="496" y="338" font-size="13" fill="#cdd0d4" xml:space="preserve">"I shipped the staging deploy yesterday.</text>
+          <text x="496" y="358" font-size="13" fill="#cdd0d4" xml:space="preserve"> The double-entry checks are passing on</text>
+          <text x="496" y="378" font-size="13" fill="#cdd0d4" xml:space="preserve"> the synthetic ledger."</text>
+          <animate attributeName="opacity" from="1" to="0" begin="6.7s" dur="0.2s" fill="freeze"/>
+        </g>
+
+        <!-- SPEAKER_01 text: appears after the first click -->
+        <g opacity="0">
+          <text x="496" y="298" font-size="20" font-weight="700" fill="#f5f5f0">Who is SPEAKER_01?</text>
+          <text x="496" y="338" font-size="13" fill="#cdd0d4" xml:space="preserve">"Quick standup. Pat, where are we on</text>
+          <text x="496" y="358" font-size="13" fill="#cdd0d4" xml:space="preserve"> the reconciliation job?"</text>
+          <animate attributeName="opacity" from="0" to="1" begin="6.95s" dur="0.2s" fill="freeze"/>
+        </g>
+      </g>
+
+      <!-- Buttons -->
+      <g font-size="14">
+        <!-- [ Sam ] -->
+        <g>
+          <rect x="496" y="420" width="100" height="44" rx="6" fill="#22222d" stroke="#3a3a44" stroke-width="1"/>
+          <text x="546" y="448" text-anchor="middle" fill="#f5f5f0">Sam</text>
+          <!-- click highlight: ring and fill flash -->
+          <rect x="496" y="420" width="100" height="44" rx="6" fill="#cc785c" opacity="0">
+            <animate attributeName="opacity" values="0;0.7;0" begin="7.9s" dur="0.4s" fill="freeze"/>
+          </rect>
+          <rect x="496" y="420" width="100" height="44" rx="6" fill="none" stroke="#cc785c" stroke-width="2" opacity="0">
+            <animate attributeName="opacity" values="0;1;0" begin="7.9s" dur="0.5s" fill="freeze"/>
+          </rect>
+        </g>
+
+        <!-- [ Pat ] -->
+        <g>
+          <rect x="612" y="420" width="100" height="44" rx="6" fill="#22222d" stroke="#3a3a44" stroke-width="1"/>
+          <text x="662" y="448" text-anchor="middle" fill="#f5f5f0">Pat</text>
+          <rect x="612" y="420" width="100" height="44" rx="6" fill="#cc785c" opacity="0">
+            <animate attributeName="opacity" values="0;0.7;0" begin="6.5s" dur="0.4s" fill="freeze"/>
+          </rect>
+          <rect x="612" y="420" width="100" height="44" rx="6" fill="none" stroke="#cc785c" stroke-width="2" opacity="0">
+            <animate attributeName="opacity" values="0;1;0" begin="6.5s" dur="0.5s" fill="freeze"/>
+          </rect>
+        </g>
+
+        <!-- [ Skip ] -->
+        <g>
+          <rect x="728" y="420" width="100" height="44" rx="6" fill="transparent" stroke="#3a3a44" stroke-width="1"/>
+          <text x="778" y="448" text-anchor="middle" fill="#6e7681">Skip</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- Cursor (the action pointer): white triangle, animates to Pat first, then to Sam -->
+    <g fill="#f5f5f0">
+      <!-- Path: arrow shape, tip at (0,0) so we can position with translate -->
+      <path d="M 0 0 L 0 18 L 5 14 L 8 22 L 11 21 L 8 13 L 14 13 Z" />
+
+      <!-- Position translate: starts at top-right of dialog, then moves to Pat, then Sam -->
+      <animateTransform attributeName="transform" type="translate"
+        keyTimes="0; 0.18; 0.32; 0.55; 0.7; 1"
+        values="
+          1050 240;
+          1050 240;
+          660 440;
+          660 440;
+          540 440;
+          540 440"
+        begin="4.8s" dur="4.0s" fill="freeze"/>
+    </g>
+  </g>
+</svg>

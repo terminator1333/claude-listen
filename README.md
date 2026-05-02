@@ -1,6 +1,6 @@
 <div align="center">
 
-# claude-listen
+<img src="./assets/wordmark.svg" alt="claude-listen" width="420">
 
 **Drop a meeting recording in. Get a speaker-labeled transcript and project-aware notes back.**
 
@@ -11,6 +11,18 @@ A [Claude Code](https://claude.ai/code) skill built on [faster-whisper](https://
 [![Python 3.10+](https://img.shields.io/badge/python-3.10--3.13-blue.svg)](https://www.python.org/)
 [![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-8A2BE2.svg)](https://claude.ai/code)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+
+</div>
+
+---
+
+<div align="center">
+
+<a href="./assets/demo.svg">
+  <img src="./assets/demo.svg" alt="claude-listen demo: /listen standup.wav → speaker-labeled transcript → project-aware notes" width="820">
+</a>
+
+<sub><em><code>/listen standup.wav extract action items and decisions</code> → transcription → speaker mapping → <code>meeting-notes.md</code> in the project's vocabulary.</em></sub>
 
 </div>
 
